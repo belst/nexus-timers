@@ -37,14 +37,8 @@ impl Timer {
         new
     }
 
-    fn find_by_name(name: &str) -> Option<usize> {
-        TIMERS
-            .get()
-            .expect("Timers to be set")
-            .lock()
-            .unwrap()
-            .iter_mut()
-            .position(|t| t.name == name)
+    fn find_by_name<'a>(timers: &'a mut Vec<Self>, name: &'_ str) -> Option<&'a mut Self> {
+        timers.iter_mut().find(|t| t.name == name)
     }
 
     const LANGS: &[&str] = &["br", "cn", "cz", "de", "en", "es", "fr", "it", "pl", "ru"];
@@ -64,14 +58,8 @@ impl Timer {
                 return;
             }
             let name = id.trim_start_matches("KB_TIMER_START_");
-            if let Some(idx) = Timer::find_by_name(name) {
-                let mut timers = TIMERS.get().expect("Timers to be set").lock().unwrap();
-                let timer = &mut timers[idx];
-                if timer.started.is_some() {
-                    // timer has to run to the end
-                    // TODO: reset timer
-                    return;
-                }
+            let mut timers = TIMERS.get().expect("Timers to be set").lock().unwrap();
+            if let Some(timer) = Timer::find_by_name(&mut *timers, name) {
                 timer.started = Some(std::time::Instant::now());
             }
         });
@@ -126,7 +114,7 @@ fn render_fn(ui: &Ui) {
         } else {
             (timer.duration - elapsed).as_secs_f32()
         };
-        Window::new(timer.name.as_str()).build(ui, || ui.text(format!("{}", rest)));
+        Window::new(timer.name.as_str()).build(ui, || ui.text(format!("{:.2}", rest)));
     }
 }
 
@@ -174,11 +162,16 @@ fn render_options(ui: &Ui) {
         NEW_DURATION.set(new_duration);
         ui.table_next_column();
         if ui.button("Add") {
-            timers.push(Timer::new(
-                NEW_NAME.replace(String::new()),
-                Duration::from_secs(NEW_DURATION.get() as u64),
-            ));
-            NEW_DURATION.set(0);
+            NEW_NAME.with_borrow(|nn| {
+                if nn.is_empty() {
+                    return;
+                }
+                timers.push(Timer::new(
+                    NEW_NAME.replace(String::new()),
+                    Duration::from_secs(NEW_DURATION.get() as u64),
+                ));
+                NEW_DURATION.set(0);
+            })
         }
     }
 }
