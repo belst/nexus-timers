@@ -162,12 +162,12 @@ fn render_options(ui: &Ui) {
         NEW_DURATION.set(new_duration);
         ui.table_next_column();
         if ui.button("Add") {
-            NEW_NAME.with_borrow(|nn| {
+            NEW_NAME.with_borrow_mut(|nn| {
                 if nn.is_empty() {
                     return;
                 }
                 timers.push(Timer::new(
-                    NEW_NAME.replace(String::new()),
+                    std::mem::take(nn),
                     Duration::from_secs(NEW_DURATION.get() as u64),
                 ));
                 NEW_DURATION.set(0);
